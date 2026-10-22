@@ -81,6 +81,9 @@ turns them into rules you must not break and tasks with acceptance criteria.
 ## Tasks, in priority order (acceptance criteria included)
 
 ### P0 — Valid baseline packaging
+**Status 2026-10-22: validation half DONE** — stricter `build_submission.py`
++ 15 tests merged (Claude patch 0001, reviewed; all tests pass, real template
+validates OK). Remaining: the starter-schema diff of `agent/agent.yaml` keys.
 `agent/` template + `scripts/build_submission.py` validate cleanly, and the
 template's keys match the official starter notebook's `agent.yaml` schema.
 ✅ Done when: build script prints OK and a diff against the starter schema
