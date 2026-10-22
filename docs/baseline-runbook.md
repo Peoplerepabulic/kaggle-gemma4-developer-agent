@@ -15,8 +15,12 @@ you do NOT need to watch it.
    - Internet: **OFF**
    - Persistence: files only (default is fine)
 3. Confirm inputs are attached (right sidebar **Input**): the competition
-   dataset + the Gemma 4 model the starter references. The starter defaults
-   to the **31B** QAT model — leave it for this baseline run.
+   dataset + the Gemma 4 model the starter references. **Correction
+   (verified 2026-10-22): starter v3 actually defaults to the 12B QAT model**
+   (`MODEL_NAME='gemma-4-12b-it-qat-w4a16-ct'` in cell 2; 31B is only the
+   sample_submission default) — leave it as is for the baseline run. The
+   baseline submitted 2026-10-22 is therefore a **12B** baseline despite its
+   version name `v1-baseline-31b-starter`.
 4. **Run All.** Don't edit any cell. The notebook: installs the offline
    wheelhouse → starts vLLM → Phase 1 generates patches on sample tasks →
    Phase 2 verifies → packages `/kaggle/working/submission.zip`.

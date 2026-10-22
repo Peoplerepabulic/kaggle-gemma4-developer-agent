@@ -2,5 +2,5 @@
 
 | Date | Config (model / LoRA / harness) | Dev pass rate | Public LB | Wall time | Min/task | Notes |
 |---|---|---|---|---|---|---|
-| — | starter unchanged (baseline #1) | | | | | fill in Week 1 |
-| — | 31B vs 12B timing test (20 dev tasks) | | | | | model decision goes here |
+| 2026-10-22 02:30 CDT | **Baseline #1 SUBMITTED** — official starter v3 unchanged. Actual model = **12B** (`gemma-4-12b-it-qat-w4a16-ct`) — starter v3's cell 2 defaults to 12B, NOT 31B (the 31B name is only the sample_submission default; our Kaggle version name `v1-baseline-31b-starter` is therefore a misnomer, kept as submitted). Notebook: https://www.kaggle.com/code/cheeway/getting-started-gemma-4-developer-agent-edcf40 | n/a (starter local sample eval only) | **pending** (status Notebook Running at submission) | notebook run 19m09s (1149s, successful, L4x4) | — | Submission entered 2026-10-22 02:30:49 CDT, the day's 1 submission used. Starter's LOCAL sample eval showed 2 agent timeouts → NO_PATCH: `fastapi_15661`, `fastapi_15588` ("Task ... agent timed out", resolved=False) — watch per-task time caps in our harness. submission.zip was 0.00 MiB (config-only payload, expected for starter). |
+| — | 31B comparison run (20 dev tasks) | | | | | Now reframed: baseline above IS the 12B datapoint. Optional 31B run only if we want the comparison; decision rule unchanged (PLAN.md Week 1) |
