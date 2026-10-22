@@ -1,0 +1,7 @@
+# Sampling — deterministic first pass (patch selection relies on test
+# execution, not on sampling luck). Exploration happens offline during
+# trajectory collection, not in the scored run.
+generation:
+  temperature: 0.2
+  top_p: 0.95
+  max_tokens: 4096

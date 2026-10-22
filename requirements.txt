@@ -1,0 +1,6 @@
+# Local / RunPod training only — the scored Kaggle run is offline and uses
+# the competition wheelhouse. Versions are floors, pin after Week-1 runs.
+torch>=2.3
+transformers>=4.44
+peft>=0.12
+accelerate>=0.34

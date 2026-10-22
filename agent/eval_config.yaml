@@ -1,0 +1,14 @@
+# Per-task limits — the 12 h total budget across ~120 tasks is the binding
+# constraint (avg 6 min/task). Caps stop one stuck task from eating the run.
+# Tune after Week-1 timing measurements; keep total worst case < 11 h to leave
+# headroom for sandbox + vLLM startup.
+defaults:
+  max_time_minutes: 5
+  max_tool_calls: 40
+  max_repair_rounds: 2
+# Tasks that reproduce cleanly and pass partial tests may earn one retry
+# (best-of-n in scripts/verifier_select.py); everything else is one-shot.
+retry:
+  enabled: true
+  max_extra_tasks_fraction: 0.25
+  min_time_remaining_minutes: 90

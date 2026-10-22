@@ -1,0 +1,7 @@
+data/*.jsonl
+data/raw/
+submission.zip
+*.safetensors
+__pycache__/
+.ipynb_checkpoints/
+.env
