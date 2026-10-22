@@ -1,8 +1,9 @@
 # Submission checklist
 
 ## Today (Oct 22)
-- [ ] Kaggle: Join competition + Accept Rules (unlocks dataset; hard gate Nov 25)
+- [x] Kaggle: Join competition + Accept Rules — **done 2026-10-22, BOTH tracks (main + paper)**
 - [ ] Solo confirmed (teams ≤5 optional; merger deadline Nov 25)
+- [ ] Baseline: follow `docs/baseline-runbook.md` — starter notebook unchanged, submit, log score + timing
 
 ## Every submission
 - [ ] `python scripts/build_submission.py` passes (root agent.yaml, no symlinks, ≤3 GiB)
