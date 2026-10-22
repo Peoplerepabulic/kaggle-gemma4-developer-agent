@@ -18,7 +18,8 @@ instruction: |
   2. Use search_similar_code and get_code_neighbors on the strongest symbol to find
      callers, callees and sibling implementations.
   3. Read only the relevant line ranges with read_file (150 lines max per call).
-  4. Stop after at most 8 tool calls.
+  4. Stop after at most 6 tool calls. Return as soon as you have one strong candidate;
+     do not spend the remaining calls confirming it.
 
   Answer in plain text, at most 12 lines:
   - up to 3 candidates as path:start-end, function name, one-line reason

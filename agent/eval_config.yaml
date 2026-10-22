@@ -1,13 +1,15 @@
 # Per-task budgets, read by the harness from the `evaluation:` mapping only (starter Cell 5,
 # HARNESS_README §7.1). Any other top-level key is ignored. Unset keys fall back to
-# 300 s / 300 s / 100 calls / 60 min / 500 turns — that fallback is what the old
-# `defaults:` layout silently got.
-# Budget math: 12 h / ~120 tasks = 6 min/task including sandbox setup (not counted in
-# max_time_minutes) and vLLM startup. 4 min leaves headroom until a scored run's wall
-# time is known; raise only with timing data in docs/experiments.md.
+# 300 s / 300 s / 100 calls / 60 min / 500 turns.
+# Time: 12 h / ~120 tasks = 6 min/task including sandbox setup (not counted in
+# max_time_minutes) and vLLM startup; 4 min x 120 = 8 h of agent time leaves ~4 h for setup.
+# Tool calls: the 2026-10-22 smoke run (fastapi_15588) used all 40 calls in 183 s (~4.6 s/call)
+# without patching, so calls, not time, were binding. 70 removes that cap; at ~4.6 s/call the
+# 240 s time cap ends a session near ~52 calls, and max_turns 60 also caps it if each turn makes
+# one call. The prompt's first-patch deadline (~call 25, ~2 min) keeps patching inside all three.
 evaluation:
   max_time_minutes: 4
-  max_tool_calls: 40
+  max_tool_calls: 70
   max_turns: 60
   timeout_seconds: 120
   verification_timeout_seconds: 300

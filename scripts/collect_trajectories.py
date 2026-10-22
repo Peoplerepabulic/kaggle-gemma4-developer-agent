@@ -77,6 +77,15 @@ def dev_split(instance_id: str, holdout_mod: int = 4) -> str:
     return "holdout" if h % holdout_mod == 0 else "train"
 
 
+def sample_order(tasks: list[Any], seed: int) -> list[Any]:
+    """Per-sample task order: concurrent samples start on different tasks (spreads sandbox load)."""
+    import random
+
+    order = list(tasks)
+    random.Random(seed).shuffle(order)
+    return order
+
+
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
@@ -391,7 +400,7 @@ async def run_samples(args: argparse.Namespace, tasks: list[Any], out_dir: Path)
         results_dir = work / "results" / f"s{idx}"
         ev = make_evaluator(sample_dir, results_dir, Path(args.data_dir), models, adapters,
                             budget, args.sandbox)
-        for k, task in enumerate(tasks, start=1):
+        for k, task in enumerate(sample_order(tasks, args.seed + idx), start=1):
             if (task.instance_id, idx) in done:
                 continue
             if time.monotonic() > deadline:

@@ -100,6 +100,14 @@ class PureTests(unittest.TestCase):
         self.assertEqual(ct.trace_to_messages({"foo": 1}), [])
         self.assertEqual(ct.trace_to_messages(None), [])
 
+    def test_sample_order_seeded_permutation(self) -> None:
+        tasks = [SimpleNamespace(instance_id=f"t{i}") for i in range(20)]
+        a = ct.sample_order(tasks, 1000)
+        self.assertEqual([t.instance_id for t in a], [t.instance_id for t in ct.sample_order(tasks, 1000)])
+        self.assertEqual(sorted(t.instance_id for t in a), sorted(t.instance_id for t in tasks))
+        self.assertNotEqual([t.instance_id for t in a], [t.instance_id for t in ct.sample_order(tasks, 1001)])
+        self.assertEqual([t.instance_id for t in tasks], [f"t{i}" for i in range(20)])  # input untouched
+
     def test_load_jsonl_tolerates_torn_line(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "r.jsonl"
@@ -111,8 +119,10 @@ class FakeEvaluator:
     def __init__(self, results_dir: Path, outcomes: dict) -> None:
         self.results_dir = results_dir
         self.outcomes = outcomes
+        self.seen: list[str] = []
 
     async def evaluate_task(self, task, task_index, total_tasks):
+        self.seen.append(task.instance_id)
         resolved, patch = self.outcomes[task.instance_id]
         traces = self.results_dir / "traces"
         traces.mkdir(parents=True, exist_ok=True)
@@ -138,8 +148,9 @@ class RunSamplesTests(unittest.TestCase):
 
     def run_once(self, tasks, outcomes, out, calls) -> None:
         def fake_eval(sample_dir, results_dir, *a, **k):
-            calls.append(sample_dir)
-            return FakeEvaluator(results_dir, outcomes)
+            ev = FakeEvaluator(results_dir, outcomes)
+            calls.append(ev)
+            return ev
 
         with mock.patch.object(ct, "start_server", return_value=(None, None, None)), \
              mock.patch.object(ct, "make_evaluator", side_effect=fake_eval):
@@ -169,6 +180,24 @@ class RunSamplesTests(unittest.TestCase):
         gold = ct.load_jsonl(out / "sft_gold.jsonl")
         self.assertEqual({r["task_id"] for r in gold}, {"t1"})
         self.assertEqual(gold[0]["issue"], "issue t1")
+
+
+    def test_shuffled_order_and_partial_resume(self) -> None:
+        ids = [f"t{i}" for i in range(8)]
+        tasks = [SimpleNamespace(instance_id=t, repo="r", problem_statement=t) for t in ids]
+        outcomes = {t: (False, "") for t in ids}
+        out = self.tmp / "out"
+        out.mkdir()
+        ct.append_jsonl(out / ct.RAW_FILE, rec("t3", 0, False, ""))
+        calls: list = []
+        self.run_once(tasks, outcomes, out, calls)
+        s0, s1 = calls
+        self.assertNotEqual(s0.seen, s1.seen)  # samples walk different orders
+        self.assertEqual(s0.seen, [t.instance_id for t in ct.sample_order(tasks, 1000) if t.instance_id != "t3"])
+        self.assertEqual(sorted(s1.seen), ids)
+        raw = ct.load_jsonl(out / ct.RAW_FILE)
+        self.assertEqual(len(raw), 16)
+        self.assertEqual(ct.done_keys(raw), {(t, i) for t in ids for i in (0, 1)})
 
 
 if __name__ == "__main__":

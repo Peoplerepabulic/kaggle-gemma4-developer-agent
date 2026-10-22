@@ -36,3 +36,10 @@
   (≤2) and push earlier patching; keep `max_time_minutes` 4–5. Scale math at
   3.05 min/sample: ~97 train tasks × n=4 ≈ 19–20 GPU-hours single-stream —
   plan on resumable multi-session collection with concurrency.
+
+- 0003 tuning: max_tool_calls 40→70, analyzer caps, first-patch deadline — pending re-smoke on fastapi_15588
+
+## Proposal (Claude, 2026-10-22, with 0003 — not applied)
+
+- **`max_turns: 60` may now bind before `max_tool_calls: 70`.** If a turn = one LLM call (the starter accepts `max_llm_calls` as an alias) and the model makes one tool call per turn, the root agent gets at most ~60 calls, possibly fewer if `code_analyzer`'s LLM calls count too. Unlike the tool-call cap, running out of turns triggers no `budget_warning`, so the agent gets no "submit now" signal. In the re-smoke, compare the trace's LLM-call count with `tool_calls`; if turns are within ~10 of 60 at termination, raise `max_turns` to ~90 (it costs nothing on its own; time stays capped at 4 min).
+- **Time will likely be the next binding cap**, not a reason to raise it yet: at the smoke rate (~4.6 s/call) 240 s ≈ 52 calls. Keep 4 min until a scored run's wall time shows setup cost per task; 5 min × 120 = 10 h of agent time leaves only ~2 h for setup + vLLM startup.
