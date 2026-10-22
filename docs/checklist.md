@@ -4,7 +4,7 @@
 - [x] Kaggle: Join competition + Accept Rules — **done 2026-10-22, BOTH tracks (main + paper)**
 - [ ] Solo confirmed (teams ≤5 optional; merger deadline Nov 25)
 - [x] Baseline SUBMITTED 2026-10-22 02:30 CDT (by Muse, authorized) — starter unchanged, version `v1-baseline-31b-starter` (actual model 12B, see experiments.md); public score pending
-- [ ] Record public score when scoring finishes (check Submissions tab)
+- [x] Public score recorded: **0.03** (2026-10-22)
 
 ## Every submission
 - [ ] `python scripts/build_submission.py` passes (root agent.yaml, no symlinks, ≤3 GiB)
