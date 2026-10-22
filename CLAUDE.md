@@ -51,9 +51,14 @@ turns them into rules you must not break and tasks with acceptance criteria.
    competition's offline wheelhouse. Context limit: vLLM `max_model_len` is
    32768 — prompts and tool outputs must be budgeted accordingly; truncate
    long test output, never dump whole files blindly.
-6. **Time discipline:** `agent/eval_config.yaml` per-task caps exist so one
-   stuck task cannot eat the run. Any retry/best-of-n logic must check the
-   remaining global budget (see the `retry:` section) before spending it.
+6. **Time discipline:** the harness reads ONLY the `evaluation:` mapping of
+   `agent/eval_config.yaml` and runs exactly one agent session per task —
+   there is no harness-level retry or best-of-n, and no view of the global
+   12 h budget from inside a session (`get_status` reports per-task time
+   only). So: per-task `evaluation.max_time_minutes` × ~120 tasks + sandbox
+   setup + vLLM startup must stay under 12 h, and any best-of-n must fit
+   inside one task's session budget (see P3). (Reworded 2026-10-22 per
+   Claude's patch-0002 proposal, approved by Qiwei.)
 7. **Sharing:** never suggest posting this code anywhere except the
    competition's own Kaggle forums/notebooks (private cross-team sharing is a
    rules breach). The GitHub repo is the human's decision, not yours.
@@ -123,6 +128,12 @@ Move `verifier_select.select_patch` policy into the agent flow: among
 candidate patches prefer (a) all-tests-passing, then (b) smallest diff;
 if none passes, fewest failing tests, then smallest diff. Gate extra samples
 on remaining time per `eval_config.yaml`.
+**In-session only (per rule 6):** the harness offers no outer retry loop, so
+implement this inside one task session — e.g. the root agent invokes a
+patch-writer sub-agent (agent_tool) up to N times, runs the targeted tests
+itself via `run_command`, applies the selection policy, and submits the
+winner. `scripts/verifier_select.py` stays the offline reference
+implementation of the policy.
 ✅ Done when: dev-split run with verifier ≥ verifier-off run, logged.
 
 ### P4 — E4B small-model variant
