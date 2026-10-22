@@ -86,8 +86,9 @@ turns them into rules you must not break and tasks with acceptance criteria.
 ## Tasks, in priority order (acceptance criteria included)
 
 ### P0 — Valid baseline packaging
-**Status 2026-10-22: DONE (pending first Kaggle run)** — validation half merged
-(patch 0001). Schema half (patch 0002): `agent/` rewritten to the official
+**Status 2026-10-22: DONE** — validation half merged (patch 0001); first
+Kaggle run 2026-10-22 (collect smoke) proved the harness compiles and runs
+our `agent/` and reads its `evaluation:` budgets live. Schema half (patch 0002): `agent/` rewritten to the official
 sample_submission schema + HARNESS_README (tools list, bare model alias,
 `generate_content_config`, `evaluation:` budgets, `sub_agents/code_analyzer.yaml`);
 the validator now rejects unknown agent / generation / eval keys, and
@@ -99,11 +100,14 @@ template's keys match the official starter notebook's `agent.yaml` schema.
 shows no unknown keys.
 
 ### P1 — Trajectory collection (finish `scripts/collect_trajectories.py`)
-**Status 2026-10-22: implemented, not yet run on Kaggle** (patch 0002). Uses the
-starter's Evaluator (Phase 2 verification = run_tests), resumable raw log,
-held-out split (sha256(id) % 4 == 0) excluded by default. Unverified against the
-real harness: trace capture (ATIF → messages) and evaluate_task concurrency —
-run the smoke test first (`--limit 1 --n 1`).
+**Status 2026-10-22: implemented + smoke-tested on Kaggle** (patch 0002;
+smoke run in docs/experiments.md). Trace capture (ATIF → messages) VERIFIED
+(48 messages on the smoke task). Uses the starter's Evaluator (Phase 2
+verification = run_tests), resumable raw log, held-out split
+(sha256(id) % 4 == 0) excluded by default. Still unverified: multi-sample
+concurrency behavior at n=4 (smoke ran n=1) — watch the first 30-task run.
+Smoke finding: 40 tool calls is too few when `code_analyzer` is used heavily
+(task localized the bug but never patched) — tune budgets/prompt next.
 Implement `run_agent()` / `run_tests()` against the competition harness
 (inside a Kaggle notebook, where repos/sandbox exist). Sample n=4 runs per
 dev task (129 public tasks: fastapi, rich, requests, httpx), execute each

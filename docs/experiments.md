@@ -12,3 +12,27 @@
 2. **P3 consequence:** verifier/best-of-n must be built inside one session — e.g. a root agent that calls a patch-writer sub-agent twice and compares test results — not as outer retries. Worth re-scoping before Week 5.
 3. **P2 A/B needs held-out tasks.** `collect_trajectories.py` excludes a deterministic ~25% held-out split by default (`holdout_ids.txt`); report the A/B pass rate on those IDs only, otherwise the LoRA is scored on its own training tasks.
 4. **12 h budget is unverified for 4 min/task.** The baseline used the sample's 1 min / 10 calls. Before the first 4-min submission, check the baseline's scoring duration on Kaggle (or the next run's) to confirm setup time per task.
+
+## 2026-10-22 — P1 smoke test on Kaggle (notebook `gemma4-collect-smoke`, L4x4)
+
+- **Transfer route solved:** competition notebooks cannot enable Internet with a
+  GPU accelerator (Kaggle error, verbatim in notebook). Code now travels as the
+  PRIVATE dataset `cheeway/gemma4-repo` (mount `/kaggle/input/datasets/cheeway/gemma4-repo`);
+  update it with a new dataset version when the repo changes.
+- **Pipeline VERIFIED end-to-end:** Cell 1 wheelhouse install OK (41 wheels,
+  52 s); vLLM started on our declared 12B; the harness read our `evaluation:`
+  budgets live (4 min / 40 calls / 60 turns / 120 s / 300 s) — P0's
+  "harness compiles our agent/" caveat is now closed. ATIF trace capture
+  works: `trace_to_messages` produced 48 messages from
+  `collect/results/s0/traces/trace_fastapi_15588.json`.
+- **Result:** 1 task × 1 sample (`--limit 1 --n 1`), whole cell 450 s, sample
+  183 s. `fastapi_15588` (also a baseline timeout task) **resolved=False,
+  diff=0**: the agent exhausted the 40 tool-call budget on exploration
+  (heavy `code_analyzer` use), correctly localized the bug
+  (`fastapi/sse.py`, planned a validator fix) but never emitted a patch.
+  Time was NOT the binding constraint (183 s < 240 s cap) — tool calls were.
+- **Tuning implications (for the next patch):** raise `max_tool_calls`
+  (40 → ~70) and/or cap `code_analyzer` invocations per task in the prompt
+  (≤2) and push earlier patching; keep `max_time_minutes` 4–5. Scale math at
+  3.05 min/sample: ~97 train tasks × n=4 ≈ 19–20 GPU-hours single-stream —
+  plan on resumable multi-session collection with concurrency.
