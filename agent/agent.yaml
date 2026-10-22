@@ -1,18 +1,20 @@
-# Root ADK agent config — Gemma 4 Developer Agent Competition
-# TEMPLATE: field names follow the Google ADK Agent Config format used by the
-# official starter notebook. After copying the starter, diff this file against
-# the starter's agent.yaml and keep the starter's exact schema keys; the values
-# (model, prompt paths, limits) are what this repo customizes.
+# Root agent — schema per the official sample_submission/agent.yaml + HARNESS_README §2.3.
+# One base model for every agent (bare alias, no provider prefix). Swap here and in
+# sub_agents/*.yaml for the E4B variant. Add `adapter: <dir under adapters/>` once a LoRA exists.
 name: gemma4_dev_agent
-# Exactly ONE base model for every agent/sub-agent in this submission.
-# Default: 12B (see README "model decision"). Alternatives:
-#   google/gemma-4-31b-it-qat-w4a16-ct  (stronger, slower — Week-1 timing gate)
-#   google/gemma-4-e4b-it-qat-w4a16-ct / gemma-4-e2b-... (fallback if time-starved)
-model: google/gemma-4-12b-it-qat-w4a16-ct
+model: gemma-4-12b-it-qat-w4a16-ct
 instruction: !include prompts/system.md
-# LoRA adapters (optional, one folder per adapter under adapters/).
-# adapters:
-#   - path: adapters/sft_v1
-# Sub-agents are invoked via agent_tool only, same base model.
-# sub_agents:
-#   - !include sub_agents/test_runner.yaml
+tools:
+  - run_command
+  - read_file
+  - edit_file
+  - write_file
+  - get_status
+  - submit_patch
+  - get_code_neighbors
+  - search_similar_code
+  - get_code_subgraph
+  - agent_tool:
+      config_path: sub_agents/code_analyzer.yaml
+      skip_summarization: true
+generate_content_config: !include configs/sampling.yaml

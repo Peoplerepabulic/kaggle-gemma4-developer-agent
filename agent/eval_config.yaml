@@ -1,14 +1,13 @@
-# Per-task limits — the 12 h total budget across ~120 tasks is the binding
-# constraint (avg 6 min/task). Caps stop one stuck task from eating the run.
-# Tune after Week-1 timing measurements; keep total worst case < 11 h to leave
-# headroom for sandbox + vLLM startup.
-defaults:
-  max_time_minutes: 5
+# Per-task budgets, read by the harness from the `evaluation:` mapping only (starter Cell 5,
+# HARNESS_README §7.1). Any other top-level key is ignored. Unset keys fall back to
+# 300 s / 300 s / 100 calls / 60 min / 500 turns — that fallback is what the old
+# `defaults:` layout silently got.
+# Budget math: 12 h / ~120 tasks = 6 min/task including sandbox setup (not counted in
+# max_time_minutes) and vLLM startup. 4 min leaves headroom until a scored run's wall
+# time is known; raise only with timing data in docs/experiments.md.
+evaluation:
+  max_time_minutes: 4
   max_tool_calls: 40
-  max_repair_rounds: 2
-# Tasks that reproduce cleanly and pass partial tests may earn one retry
-# (best-of-n in scripts/verifier_select.py); everything else is one-shot.
-retry:
-  enabled: true
-  max_extra_tasks_fraction: 0.25
-  min_time_remaining_minutes: 90
+  max_turns: 60
+  timeout_seconds: 120
+  verification_timeout_seconds: 300

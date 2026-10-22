@@ -1,0 +1,39 @@
+# Read-only localization helper, called by the root agent via agent_tool (HARNESS_README §10.4):
+# its file reads stay out of the root agent's context; only its short final answer returns.
+# Instruction and sampling are inline on purpose (avoids !include path resolution from sub_agents/).
+name: code_analyzer
+model: gemma-4-12b-it-qat-w4a16-ct
+description: >-
+  Read-only code locator. Give it the bug symptom (error message, function or class names,
+  behavior). It searches the repository and returns the most likely files, functions and
+  line ranges for the root cause, with a one-line reason each. It never edits files.
+instruction: |
+  You locate the root cause of a Python bug in the repository under /workspace. You are
+  read-only: never create, edit or delete files, and only run read-only shell commands
+  (grep -rn, ls, find, sed -n, head). Never run tests or install anything.
+
+  Method:
+  1. Pull concrete identifiers from the request: error messages, function, class and
+     parameter names. grep -rn for them, excluding tests and docs first.
+  2. Use search_similar_code and get_code_neighbors on the strongest symbol to find
+     callers, callees and sibling implementations.
+  3. Read only the relevant line ranges with read_file (150 lines max per call).
+  4. Stop after at most 8 tool calls.
+
+  Answer in plain text, at most 12 lines:
+  - up to 3 candidates as path:start-end, function name, one-line reason
+  - the single most likely root cause in one sentence
+  - the existing test file that covers this code, if you saw one
+tools:
+  - run_command
+  - read_file
+  - get_code_neighbors
+  - search_similar_code
+  - get_code_subgraph
+generate_content_config:
+  temperature: 0.2
+  top_p: 0.95
+  max_output_tokens: 8192
+  thinking_config:
+    thinking_budget: 2048
+    include_thoughts: true

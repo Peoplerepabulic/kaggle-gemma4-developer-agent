@@ -1,7 +1,10 @@
-# Sampling — deterministic first pass (patch selection relies on test
-# execution, not on sampling luck). Exploration happens offline during
-# trajectory collection, not in the scored run.
-generation:
-  temperature: 0.2
-  top_p: 0.95
-  max_tokens: 4096
+# Loaded as generate_content_config (HARNESS_README §2.4). Flat GenerateContentConfig fields only.
+# max_output_tokens 16384 + thinking_budget 4096 is the README §10.1 recommendation; with the
+# harness's 14,336-token compaction threshold it keeps prompt + output under max_model_len 32768.
+# Do not add thinking_level (maps to reasoning_effort, dropped by vLLM/LiteLLM).
+temperature: 0.2
+top_p: 0.95
+max_output_tokens: 16384
+thinking_config:
+  thinking_budget: 4096
+  include_thoughts: true

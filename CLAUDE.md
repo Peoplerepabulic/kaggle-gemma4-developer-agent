@@ -81,15 +81,24 @@ turns them into rules you must not break and tasks with acceptance criteria.
 ## Tasks, in priority order (acceptance criteria included)
 
 ### P0 — Valid baseline packaging
-**Status 2026-10-22: validation half DONE** — stricter `build_submission.py`
-+ 15 tests merged (Claude patch 0001, reviewed; all tests pass, real template
-validates OK). Remaining: the starter-schema diff of `agent/agent.yaml` keys.
+**Status 2026-10-22: DONE (pending first Kaggle run)** — validation half merged
+(patch 0001). Schema half (patch 0002): `agent/` rewritten to the official
+sample_submission schema + HARNESS_README (tools list, bare model alias,
+`generate_content_config`, `evaluation:` budgets, `sub_agents/code_analyzer.yaml`);
+the validator now rejects unknown agent / generation / eval keys, and
+`tests/fixtures/starter_agent.yaml` (official file, verbatim) passes it.
+Not yet proven: that the harness compiles our `agent/` — first notebook run will show.
 `agent/` template + `scripts/build_submission.py` validate cleanly, and the
 template's keys match the official starter notebook's `agent.yaml` schema.
 ✅ Done when: build script prints OK and a diff against the starter schema
 shows no unknown keys.
 
 ### P1 — Trajectory collection (finish `scripts/collect_trajectories.py`)
+**Status 2026-10-22: implemented, not yet run on Kaggle** (patch 0002). Uses the
+starter's Evaluator (Phase 2 verification = run_tests), resumable raw log,
+held-out split (sha256(id) % 4 == 0) excluded by default. Unverified against the
+real harness: trace capture (ATIF → messages) and evaluate_task concurrency —
+run the smoke test first (`--limit 1 --n 1`).
 Implement `run_agent()` / `run_tests()` against the competition harness
 (inside a Kaggle notebook, where repos/sandbox exist). Sample n=4 runs per
 dev task (129 public tasks: fastapi, rich, requests, httpx), execute each
