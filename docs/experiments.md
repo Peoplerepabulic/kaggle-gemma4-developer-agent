@@ -43,3 +43,21 @@
 
 - **`max_turns: 60` may now bind before `max_tool_calls: 70`.** If a turn = one LLM call (the starter accepts `max_llm_calls` as an alias) and the model makes one tool call per turn, the root agent gets at most ~60 calls, possibly fewer if `code_analyzer`'s LLM calls count too. Unlike the tool-call cap, running out of turns triggers no `budget_warning`, so the agent gets no "submit now" signal. In the re-smoke, compare the trace's LLM-call count with `tool_calls`; if turns are within ~10 of 60 at termination, raise `max_turns` to ~90 (it costs nothing on its own; time stays capped at 4 min).
 - **Time will likely be the next binding cap**, not a reason to raise it yet: at the smoke rate (~4.6 s/call) 240 s ≈ 52 calls. Keep 4 min until a scored run's wall time shows setup cost per task; 5 min × 120 = 10 h of agent time leaves only ~2 h for setup + vLLM startup.
+
+## 2026-10-22 — Re-smoke after 0003 (same task, fastapi_15588, dataset v2)
+
+- **Success criterion met: diff=8 > 0.** The agent patched this time — 13 tool
+  calls of 70 (no budget termination), 21 messages, 224 s. The patch (938
+  chars) adds validators to `ServerSentEvent` in `fastapi/sse.py` — the same
+  fix the smoke-1 agent had planned but never wrote.
+- **resolved=False**: Phase-2 tests failed (exit 1). The fix idea is wrong or
+  incomplete for this task, and with only 13 calls the agent's own VERIFY step
+  was thin. Failure mode flipped vs smoke 1 (all-explore-no-patch →
+  quick-patch-thin-verify). This task is a known-hard outlier (baseline also
+  failed it); do not over-tune on n=1.
+- max_turns did not bind (13 calls / 21 msgs). Trace source this run:
+  `result.trace` attribute (vs file in smoke 1) — both paths work.
+- Next: 30-task collection (--limit 30 --n 4 --concurrency 4) for the first
+  real pass-rate / gold-silver yield numbers; est. ~2–3 h wall in one session
+  at ~3.7 min/sample. Fix-quality work (deeper verify, verifier selection)
+  belongs to P2/P3, informed by that yield.
