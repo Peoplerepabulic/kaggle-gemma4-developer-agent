@@ -91,3 +91,22 @@ Readings:
   harness-v1.1 (12B, no LoRA) = 2/30 tasks, 5.8% sample pass.
 
 - 0004 P2 SFT implemented (pipeline validation scope) — pending Kaggle smoke on 7 gold rows
+
+## 2026-10-25 — P2 dry-run VERIFIED on Kaggle (notebook gemma4-train-smoke, CPU session)
+
+- Template fidelity: `port == tokenizer.apply_chat_template on all 7 rows` —
+  the hand-ported Gemma 4 renderer is byte-exact against the real tokenizer.
+- All 7 gold rows tokenize with supervised tokens in the 1–40% band (no WARN):
+  total 41,086 tokens, 6,627 supervised (16.13%). Gold tasks: fastapi_14492
+  (3 samples) + fastapi_14786 (4 samples). One row truncated (10,330 → 8,015,
+  7 steps dropped) per the designed policy. Masked-sample inspection correct
+  (system/issue masked; patch turns + final summary trained).
+- Env: torch 2.11 / transformers 5.16.1 / peft 0.20 / accelerate 1.14 all in
+  the base image (trl absent, not needed). bf16 twin mount:
+  /kaggle/input/models/google/gemma-4/transformers/gemma-4-12b-it/2
+  (tokenizer MUST point at the /2 subdir).
+- **Accelerator constraint discovered:** L4x4 is offered only on
+  competition-attached notebooks; a fresh non-competition notebook offers
+  only None / T4 x2 / TPU. Stage-2 training therefore runs in a copy of the
+  collect notebook (which retains L4x4), with the transformers-variant model
+  attached additionally. Internet is available in non-competition notebooks.
