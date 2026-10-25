@@ -61,3 +61,31 @@
   real pass-rate / gold-silver yield numbers; est. ~2–3 h wall in one session
   at ~3.7 min/sample. Fix-quality work (deeper verify, verifier selection)
   belongs to P2/P3, informed by that yield.
+
+## 2026-10-23 — 30-task collection COMPLETE (v3-collect-30x4, results read 2026-10-25)
+
+Notebook Output persisted after all (the "no saved version" the user saw was a
+display quirk; the run finished and its Output is intact and attachable).
+
+| metric | value |
+|---|---|
+| tasks covered / samples | 30 / 120 (all 30×4 ran) |
+| sample pass rate | **0.0583** (7/120) |
+| task pass@4 | **0.0667** (2/30) |
+| gold | 2 tasks, **7 rows** (195.56 kB sft_gold.jsonl) |
+| silver / divergent | 0 / 0 — every passing sample converged with another |
+| avg diff size (kept) | 2 lines |
+| avg minutes/sample | **3.98** (≈ the 4-min cap — time IS binding in collection) |
+| kept rows missing messages | 0 (all gold rows SFT-ready) |
+
+Readings:
+- Concurrency barely helped: ~478 sample-minutes took 6+ wall hours
+  (effective parallelism ≈1.3×, sandbox CPU contention). Plan future wall
+  time as samples × ~4 min / 1.3.
+- 7 gold rows is far too few for P2 SFT. At this rate the full ~97-task
+  train split yields only ~20-25 gold rows. Yield must be raised BEFORE
+  mass collection: the lever is collection-only budget overrides (the
+  collect script's --max-time-minutes; scored-run config stays at 4 min),
+  since avg sample time sits at the cap.
+- This is the first real dev-set row for the Paper Track table:
+  harness-v1.1 (12B, no LoRA) = 2/30 tasks, 5.8% sample pass.
