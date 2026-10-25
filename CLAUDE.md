@@ -120,6 +120,10 @@ candidate patch's tests, classify:
 (tasks covered, pass rate, avg diff size).
 
 ### P2 — LoRA SFT (finish `scripts/train_lora_sft.py`)
+**Status 2026-10-25: implemented (patch 0004), pending Kaggle smoke** — full
+render/mask/train/export implementation with template cross-check; 59 tests
+pass (2 tokenizer-dependent skipped locally). Smoke = dry-run stats on the
+real 7 gold rows + 2-epoch train + adapter serves in harness (1 task).
 Wire the HF Trainer loop: inputs = issue + trajectory messages, labels only
 on patch-producing turns (mask the rest). Train on the UNQUANTIZED twin of
 the chosen QAT base; export PEFT adapter to `agent/adapters/sft_v1/`.

@@ -89,3 +89,5 @@ Readings:
   since avg sample time sits at the cap.
 - This is the first real dev-set row for the Paper Track table:
   harness-v1.1 (12B, no LoRA) = 2/30 tasks, 5.8% sample pass.
+
+- 0004 P2 SFT implemented (pipeline validation scope) — pending Kaggle smoke on 7 gold rows
