@@ -136,3 +136,9 @@ transformers 5.13.1, peft 0.19.1, torchao uninstalled for peft compat).
   re-test in a clean collect-notebook environment with the adapter attached
   as a notebook-output input. Adapter + wired agent preserved in train-l4's
   working dir (to be snapshotted as a saved version).
+- Correction to the above: Quick Save does NOT persist /kaggle/working as
+  version Output (verified 2026-10-25 — Version 1 of gemma4-train-l4 has 0
+  output files; only Save & Run All commits working files). The smoke
+  adapter (218 supervised tokens) is a throwaway and will NOT be preserved;
+  after 0005 lands, retrain (2 min) + serve test rerun in a clean
+  collect-copy environment, committed via Save & Run All.
