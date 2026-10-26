@@ -144,3 +144,22 @@ transformers 5.13.1, peft 0.19.1, torchao uninstalled for peft compat).
   collect-copy environment, committed via Save & Run All.
 
 - 0005: chunked CE loss (default; --loss-mode naive kept) + collect --enforce-eager / --gpu-memory-utilization; Cell 1 verbatim in baseline-runbook — pending re-smoke: train 7 gold rows at --max-len 8192, then serve test
+
+## 2026-10-25 — P2 PIPELINE FULLY VALIDATED (clean env, gemma4-collect-smoke)
+
+- **Training at --max-len 8192 with chunked loss: SUCCESS, no OOM.** 14/14
+  steps, 459 s, train_loss 0.4307 (final step 0.2445). STATS identical to the
+  original full-length dry-run (7 examples, 41,086 tokens, 6,627 supervised,
+  16.13%) — data integrity confirmed end to end. Adapter: 262.4 MB, keys text.
+  Env note: after the wheelhouse Cell 1, peft is 0.19.1 and its torchao check
+  fails against the base image's torchao 0.10.0 — `pip uninstall -y torchao`
+  is a required setup step in this environment (both train notebooks hit it).
+- **Serve test: PASSED first try, no --enforce-eager needed.** Full task ran
+  with the adapter wired (agent.yaml `adapter: sft_v1`, server started with
+  enable_lora + adapter manifest, zero LoRA key errors). The earlier
+  CUDA-graph OOM was therefore environment drift in the hand-patched session,
+  not LoRA. fastapi_15588 again unresolved (diff=0, 65 msgs, 109 s) — a task
+  result, not a pipeline issue; adapter-vs-base behavior differences are for
+  the real A/B after expanded collection.
+- P2 status: implementation + pipeline DONE. Remaining P2 item per CLAUDE.md
+  is the dev-split A/B row, which needs a real adapter from expanded data.
