@@ -285,3 +285,120 @@ class HFTokenizerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+HAS_TORCH = all(importlib.util.find_spec(m) for m in ("torch", "transformers"))
+
+
+def tiny_gemma4(kind: str = "text", vocab: int = 97, softcap: float | None = 30.0):
+    import torch
+    from transformers import Gemma4Config, Gemma4ForCausalLM, Gemma4ForConditionalGeneration, Gemma4TextConfig
+
+    torch.manual_seed(0)
+    kw = dict(vocab_size=vocab, hidden_size=32, intermediate_size=64, num_hidden_layers=2, num_attention_heads=2,
+              num_key_value_heads=1, head_dim=16, max_position_embeddings=256, final_logit_softcapping=softcap)
+    try:
+        tc = Gemma4TextConfig(**kw, hidden_size_per_layer_input=0)
+    except TypeError:
+        tc = Gemma4TextConfig(**kw)
+    if kind == "text":
+        return Gemma4ForCausalLM(tc).float()
+    return Gemma4ForConditionalGeneration(
+        Gemma4Config(text_config=tc.to_dict(), vision_config=None, audio_config=None)).float()
+
+
+def random_batch(vocab: int = 97, b: int = 2, n: int = 37):
+    import torch
+
+    g = torch.Generator().manual_seed(1)
+    ids = torch.randint(1, vocab, (b, n), generator=g)
+    labels = ids.clone()
+    labels[:, :9] = t.IGNORE                                  # prompt head
+    labels[torch.rand(b, n, generator=g) < 0.3] = t.IGNORE    # scattered masked spans
+    att = torch.ones(b, n, dtype=torch.long)
+    att[1, -6:] = 0                                           # padded tail on row 2
+    labels[1, -6:] = t.IGNORE
+    return {"input_ids": ids, "attention_mask": att, "labels": labels}
+
+
+@unittest.skipUnless(HAS_TORCH, "torch/transformers not installed")
+class ChunkedLossTests(unittest.TestCase):
+    def grads(self, model, loss):
+        model.zero_grad()
+        loss.backward()
+        return {n: p.grad.detach().clone() for n, p in model.named_parameters() if p.grad is not None}
+
+    def test_matches_naive_loss_and_grads(self) -> None:
+        for softcap in (30.0, None):
+            with self.subTest(softcap=softcap):
+                model = tiny_gemma4(softcap=softcap).eval()
+                batch = random_batch()
+                naive = model(**batch).loss
+                g_naive = self.grads(model, naive)
+                chunked = t.chunked_loss_from_inputs(model, batch, chunk_size=8)
+                g_chunked = self.grads(model, chunked)
+                self.assertLess(abs(naive.item() - chunked.item()), 1e-5)
+                self.assertEqual(g_naive.keys(), g_chunked.keys())
+                for n in g_naive:
+                    self.assertLess((g_naive[n] - g_chunked[n]).abs().max().item(), 1e-5, n)
+
+    def test_chunk_size_invariance(self) -> None:
+        import torch
+
+        model = tiny_gemma4().eval()
+        batch = random_batch()
+        with torch.no_grad():
+            ref = model(**batch).loss.item()
+            for c in (1, 5, 36, 37, 4096):
+                self.assertLess(abs(t.chunked_loss_from_inputs(model, batch, c).item() - ref), 1e-5, c)
+
+    def test_all_masked_is_zero_and_backprops(self) -> None:
+        model = tiny_gemma4().eval()
+        batch = random_batch()
+        batch["labels"][:] = t.IGNORE
+        loss = t.chunked_loss_from_inputs(model, batch, 8)
+        loss.backward()
+        self.assertEqual(loss.item(), 0.0)
+
+    def test_no_full_vocab_logits_saved_for_backward(self) -> None:
+        import torch
+
+        vocab = 2048
+        model = tiny_gemma4(vocab=vocab).eval()
+        batch = random_batch(vocab=vocab, b=2, n=200)
+        for mode, expect_logits in (("naive", True), ("chunked", False)):
+            saved = []
+
+            def pack(x):
+                saved.append(tuple(x.shape))
+                return x
+
+            with torch.autograd.graph.saved_tensors_hooks(pack, lambda x: x):
+                loss = model(**batch).loss if mode == "naive" else t.chunked_loss_from_inputs(model, batch, 16)
+            big = [sh for sh in saved if sh and sh[-1] == vocab and len(sh) >= 2 and sh[-2] > 16]
+            self.assertEqual(bool(big), expect_logits, (mode, big[:3]))
+            loss.backward()
+
+    @unittest.skipUnless(importlib.util.find_spec("peft") and importlib.util.find_spec("accelerate"), "peft missing")
+    def test_trainer_compute_loss_on_peft_multimodal(self) -> None:
+        import torch
+        from peft import LoraConfig, get_peft_model
+        from transformers import TrainingArguments
+
+        model = tiny_gemma4("mm")
+        model = get_peft_model(model, LoraConfig(r=4, lora_alpha=8, lora_dropout=0.0,
+                                                 target_modules=t.target_regex(t.DEFAULT_TARGETS.split(",")),
+                                                 task_type="CAUSAL_LM"))
+        for n, p in model.named_parameters():
+            if "lora_B" in n:
+                torch.nn.init.normal_(p, std=0.02)  # non-trivial adapter
+        model.eval()
+        batch = random_batch()
+        with tempfile.TemporaryDirectory() as d:
+            args = TrainingArguments(output_dir=d, use_cpu=True, report_to="none", per_device_train_batch_size=1)
+            trainer = t.make_trainer_cls("chunked", 8)(model=model, args=args)
+            self.assertFalse(trainer.model_accepts_loss_kwargs)
+            chunked = trainer.compute_loss(model, dict(batch))
+        naive = model(**batch).loss
+        self.assertLess(abs(naive.item() - chunked.item()), 1e-5)
+        self.assertIs(t.make_trainer_cls("naive", 8).__name__, "Trainer")

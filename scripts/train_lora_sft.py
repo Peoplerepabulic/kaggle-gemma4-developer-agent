@@ -24,6 +24,9 @@ of the body. A row with no supervised token left is dropped.
 
 Training: LoRA r16/a32/d0.05 on the language model's q,k,v,o,gate,up,down,
 bf16, gradient checkpointing, batch 1, cosine lr 1e-4, local weights only.
+Loss (default --loss-mode chunked): lm_head + fp32 cross-entropy per 1024
+positions under checkpointing, because the naive fp32 logits of a ~262k vocab
+at 8192 tokens (~8 GB) OOM one L4.
 Export: agent/adapters/sft_v1/{adapter_config.json, adapter_model.safetensors},
 keys renamed to the text-only layout (model.layers.*) that vLLM's
 Gemma4ForCausalLM override serves; --key-style as-trained keeps PEFT's names.
@@ -391,6 +394,82 @@ def print_report(examples: list[Example], stats: dict, tokenizer: Any, show_row:
         print(show_masked(tokenizer, ex, elide))
 
 
+# ------------------------------------------------------------ chunked loss
+
+def chunked_causal_lm_loss(hidden: Any, lm_head: Any, labels: Any, chunk_size: int = 1024,
+                           softcap: float | None = None) -> Any:
+    """Shifted causal-LM cross-entropy without materializing [T, vocab] logits.
+
+    Same semantics as transformers' ForCausalLMLoss (fp32 CE, labels -100 ignored, mean over
+    supervised tokens): position t predicts labels[t+1]. Each chunk of positions goes
+    lm_head -> softcap -> CE under activation checkpointing, so only one chunk's logits exist
+    at a time, in forward and in backward.
+    """
+    import torch
+    import torch.nn.functional as F
+    from torch.utils.checkpoint import checkpoint
+
+    dev = lm_head.weight.device
+    h = hidden[:, :-1, :].to(dev)
+    y = labels[:, 1:].to(dev)
+
+    def chunk_sum(hc: Any, yc: Any) -> Any:
+        logits = lm_head(hc).float()
+        if softcap:
+            logits = torch.tanh(logits / softcap) * softcap
+        return F.cross_entropy(logits.reshape(-1, logits.size(-1)), yc.reshape(-1),
+                               ignore_index=IGNORE, reduction="sum")
+
+    total = h.new_zeros((), dtype=torch.float32)
+    for s in range(0, h.size(1), chunk_size):
+        yc = y[:, s:s + chunk_size]
+        if not bool((yc != IGNORE).any()):
+            continue
+        hc = h[:, s:s + chunk_size, :]
+        total = total + (checkpoint(chunk_sum, hc, yc, use_reentrant=False)
+                         if torch.is_grad_enabled() else chunk_sum(hc, yc))
+    count = (y != IGNORE).sum()
+    return total / count.clamp(min=1) if bool(count > 0) else total + hidden.sum() * 0.0
+
+
+def hf_parts(model: Any) -> tuple[Any, Any, float | None]:
+    """(decoder returning last_hidden_state, lm_head, final_logit_softcapping) for HF or PEFT-wrapped models."""
+    hf = model.get_base_model() if hasattr(model, "get_base_model") else model
+    decoder = getattr(hf, hf.base_model_prefix)
+    cfg = hf.config.get_text_config() if hasattr(hf.config, "get_text_config") else hf.config
+    return decoder, hf.get_output_embeddings(), getattr(cfg, "final_logit_softcapping", None)
+
+
+def chunked_loss_from_inputs(model: Any, inputs: dict, chunk_size: int) -> Any:
+    decoder, lm_head, softcap = hf_parts(model)
+    out = decoder(input_ids=inputs["input_ids"], attention_mask=inputs.get("attention_mask"), use_cache=False)
+    return chunked_causal_lm_loss(out.last_hidden_state, lm_head, inputs["labels"], chunk_size, softcap)
+
+
+def make_trainer_cls(loss_mode: str, chunk_size: int) -> Any:
+    from transformers import Trainer
+
+    if loss_mode == "naive":
+        return Trainer
+
+    class ChunkedLossTrainer(Trainer):
+        """compute_loss via chunked CE. Returns a per-micro-batch mean (Trainer divides by GA steps);
+        identical to the naive loss at the default batch 1 / grad_accum 1."""
+
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            super().__init__(*a, **kw)
+            self.model_accepts_loss_kwargs = False
+            if hasattr(self, "loss_is_scaled_for_ga"):
+                self.loss_is_scaled_for_ga = False
+
+        def compute_loss(self, model: Any, inputs: dict, return_outputs: bool = False,
+                         num_items_in_batch: Any = None) -> Any:
+            loss = chunked_loss_from_inputs(self.accelerator.unwrap_model(model), inputs, chunk_size)
+            return (loss, {"loss": loss}) if return_outputs else loss
+
+    return ChunkedLossTrainer
+
+
 # ------------------------------------------------------------ train/export
 
 def infer_base_name(base: str, explicit: str | None) -> str:
@@ -437,7 +516,7 @@ def finalize_adapter(out: Path, base_name: str, targets: list[str], style: str) 
 def train(args: argparse.Namespace, examples: list[Example]) -> None:
     import torch
     from peft import LoraConfig, get_peft_model
-    from transformers import AutoModelForCausalLM, Trainer, TrainingArguments
+    from transformers import AutoModelForCausalLM, TrainingArguments
 
     targets = [t.strip() for t in args.target_modules.split(",") if t.strip()]
     base_name = infer_base_name(args.base, args.base_name)
@@ -480,7 +559,9 @@ def train(args: argparse.Namespace, examples: list[Example]) -> None:
         optim=args.optim, logging_steps=1, save_strategy="no", report_to="none",
         remove_unused_columns=False, seed=args.seed, dataloader_num_workers=0, use_cpu=args.cpu,
     )
-    Trainer(model=model, args=targs, train_dataset=DS(), data_collator=collate).train()
+    trainer_cls = make_trainer_cls(args.loss_mode, args.loss_chunk)
+    print(f"loss: {args.loss_mode}" + (f" (chunk {args.loss_chunk} positions)" if args.loss_mode == "chunked" else ""))
+    trainer_cls(model=model, args=targs, train_dataset=DS(), data_collator=collate).train()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(out), safe_serialization=True)
@@ -512,6 +593,9 @@ def main() -> int:
     ap.add_argument("--attn-impl", default="sdpa")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--cpu", action="store_true", help="CPU wiring test on a tiny model only")
+    ap.add_argument("--loss-mode", choices=["chunked", "naive"], default="chunked",
+                    help="chunked: lm_head+CE per --loss-chunk positions (no full fp32 logits); naive: HF default")
+    ap.add_argument("--loss-chunk", type=int, default=1024)
     ap.add_argument("--dry-run", action="store_true", help="tokenizer only: stats + one masked sample")
     ap.add_argument("--show-row", type=int, default=0)
     ap.add_argument("--elide", type=int, default=300, help="masked spans longer than 2x this are elided (0 = full)")

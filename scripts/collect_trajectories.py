@@ -300,7 +300,36 @@ def find_trace(result: Any, results_dir: Path, task_id: str) -> tuple[Any, str |
     return None, None
 
 
-def start_server(agent_dir: Path, model_root: Path, model_version: str) -> tuple[Any, Any, Any]:
+def vllm_knobs(cfg_cls: Any, extra_args: tuple, enforce_eager: bool = False,
+               gpu_memory_utilization: float = 0.90) -> dict[str, Any]:
+    """VllmConfig kwargs for the serve-test knobs. With defaults this is exactly the starter's
+    {gpu_memory_utilization: 0.90, extra_args: <model extra>}. enforce_eager uses a first-class
+    VllmConfig field when adk-submission has one, else the vLLM CLI flag via extra_args."""
+    kw: dict[str, Any] = {"gpu_memory_utilization": gpu_memory_utilization, "extra_args": tuple(extra_args)}
+    if enforce_eager:
+        if "enforce_eager" in _config_fields(cfg_cls):
+            kw["enforce_eager"] = True
+        else:
+            kw["extra_args"] = kw["extra_args"] + ("--enforce-eager",)
+    return kw
+
+
+def _config_fields(cfg_cls: Any) -> set[str]:
+    import dataclasses
+    import inspect
+
+    if dataclasses.is_dataclass(cfg_cls):
+        return {f.name for f in dataclasses.fields(cfg_cls)}
+    names = set(getattr(cfg_cls, "model_fields", {}) or {})  # pydantic
+    try:
+        names |= set(inspect.signature(cfg_cls).parameters)
+    except (TypeError, ValueError):
+        pass
+    return names
+
+
+def start_server(agent_dir: Path, model_root: Path, model_version: str,
+                 enforce_eager: bool = False, gpu_memory_utilization: float = 0.90) -> tuple[Any, Any, Any]:
     """Starter Cell 4, unchanged in substance."""
     import re
     import litellm
@@ -327,11 +356,12 @@ def start_server(agent_dir: Path, model_root: Path, model_version: str) -> tuple
         model=str(model_path), port=8000, host="127.0.0.1",
         tool_call_parser="gemma4", reasoning_parser="gemma4", max_model_len=32768,
         dtype="bfloat16" if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else "auto",
-        gpu_memory_utilization=0.90, enable_auto_tool_choice=True,
+        enable_auto_tool_choice=True,
         enable_lora=bool(amap), max_loras=max(1, len(amap)),
         max_lora_rank=max(ranks) if ranks else 128, scheduler_reserve_full_isl=False,
         tensor_parallel_size=4 if gpus >= 4 else (2 if gpus >= 2 else 1),
-        startup_timeout=60 * 20, extra_args=extra.get(model, ()),
+        startup_timeout=60 * 20,
+        **vllm_knobs(VllmConfig, extra.get(model, ()), enforce_eager, gpu_memory_utilization),
     )
     server = VllmServer(cfg, adapter_manifest=adapters)
     server.start()
@@ -388,7 +418,9 @@ async def run_samples(args: argparse.Namespace, tasks: list[Any], out_dir: Path)
     budget = read_eval_budget(agent_dir)
     if args.max_time_minutes:
         budget["max_time_minutes"] = args.max_time_minutes
-    _server, models, adapters = start_server(agent_dir, Path(args.model_root), args.model_version)
+    _server, models, adapters = start_server(agent_dir, Path(args.model_root), args.model_version,
+                                             getattr(args, "enforce_eager", False),
+                                             getattr(args, "gpu_memory_utilization", 0.90))
     deadline = time.monotonic() + args.stop_after_hours * 3600
     sem = asyncio.Semaphore(max(1, args.concurrency))
     write_lock = asyncio.Lock()
@@ -466,6 +498,9 @@ def main() -> None:
     ap.add_argument("--max-time-minutes", type=float, default=0, help="override eval_config per-task cap")
     ap.add_argument("--stop-after-hours", type=float, default=10.5, help="no new samples after this")
     ap.add_argument("--sandbox", default="subprocess")
+    ap.add_argument("--enforce-eager", action="store_true",
+                    help="skip vLLM CUDA graph capture (serve tests with LoRA that OOM in capture)")
+    ap.add_argument("--gpu-memory-utilization", type=float, default=0.90)
     ap.add_argument("--classify-only", action="store_true", help="rebuild gold/silver from raw log")
     args = ap.parse_args()
 

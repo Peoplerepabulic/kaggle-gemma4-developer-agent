@@ -202,3 +202,75 @@ class RunSamplesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VllmKnobTests(unittest.TestCase):
+    STARTER = {  # starter Cell 4 VllmConfig kwargs for 12B, no adapters, 4 GPUs
+        "port": 8000, "host": "127.0.0.1", "tool_call_parser": "gemma4", "reasoning_parser": "gemma4",
+        "max_model_len": 32768, "dtype": "bfloat16", "gpu_memory_utilization": 0.90,
+        "enable_auto_tool_choice": True, "enable_lora": False, "max_loras": 1, "max_lora_rank": 128,
+        "scheduler_reserve_full_isl": False, "tensor_parallel_size": 4, "startup_timeout": 1200,
+        "extra_args": ("--hf-overrides", '{"architectures": ["Gemma4ForCausalLM"], "model_type": "gemma4"}'),
+    }
+
+    def run_start(self, cfg_cls, **kw) -> dict:
+        import dataclasses
+
+        captured = {}
+
+        def record(**kwargs):
+            captured.update(kwargs)
+            return cfg_cls(**{k: v for k, v in kwargs.items() if k in {f.name for f in dataclasses.fields(cfg_cls)}})
+
+        server = mock.MagicMock()
+        fake = {
+            "litellm": SimpleNamespace(drop_params=False),
+            "torch": SimpleNamespace(cuda=SimpleNamespace(device_count=lambda: 4, is_available=lambda: True,
+                                                          is_bf16_supported=lambda: True)),
+            "adk_submission": SimpleNamespace(VllmConfig=mock.MagicMock(side_effect=record),
+                                              VllmServer=mock.MagicMock(return_value=server),
+                                              discover_adapters=lambda *a, **k: SimpleNamespace(adapters={})),
+            "adk_submission.discovery": SimpleNamespace(
+                discover_declared_models=lambda d: {"gemma-4-12b-it-qat-w4a16-ct"}),
+            "swegemma": SimpleNamespace(), "swegemma.config": SimpleNamespace(ALLOWED_ADAPTER_EXTENSIONS=(".safetensors",)),
+        }
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(sys.modules, fake), \
+                mock.patch.object(ct, "_config_fields", side_effect=lambda c: {f.name for f in dataclasses.fields(cfg_cls)}):
+            (Path(d) / "gemma-4-12b-it-qat-w4a16-ct" / "2").mkdir(parents=True)
+            ct.start_server(Path(d), Path(d), "2", **kw)
+        captured.pop("model")
+        return captured
+
+    def cfg(self, with_eager: bool):
+        import dataclasses
+
+        fields = [(n, object, None) for n in self.STARTER] + [("model", object, None)]
+        if with_eager:
+            fields.append(("enforce_eager", bool, False))
+        return dataclasses.make_dataclass("VllmConfig", fields)
+
+    def test_defaults_identical_to_starter(self) -> None:
+        for with_eager in (True, False):
+            self.assertEqual(self.run_start(self.cfg(with_eager)), self.STARTER)
+
+    def test_enforce_eager_first_class_field(self) -> None:
+        got = self.run_start(self.cfg(True), enforce_eager=True, gpu_memory_utilization=0.8)
+        self.assertEqual(got, {**self.STARTER, "enforce_eager": True, "gpu_memory_utilization": 0.8})
+
+    def test_enforce_eager_via_extra_args(self) -> None:
+        got = self.run_start(self.cfg(False), enforce_eager=True)
+        self.assertEqual(got["extra_args"], self.STARTER["extra_args"] + ("--enforce-eager",))
+        self.assertNotIn("enforce_eager", got)
+
+    def test_config_fields_detection(self) -> None:
+        import dataclasses
+
+        self.assertIn("enforce_eager", ct._config_fields(self.cfg(True)))
+        self.assertNotIn("enforce_eager", ct._config_fields(self.cfg(False)))
+
+        class Plain:
+            def __init__(self, model, enforce_eager=False):
+                pass
+
+        self.assertIn("enforce_eager", ct._config_fields(Plain))
+        self.assertTrue(dataclasses.is_dataclass(self.cfg(True)))

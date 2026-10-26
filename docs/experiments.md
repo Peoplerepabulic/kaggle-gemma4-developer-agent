@@ -142,3 +142,5 @@ transformers 5.13.1, peft 0.19.1, torchao uninstalled for peft compat).
   adapter (218 supervised tokens) is a throwaway and will NOT be preserved;
   after 0005 lands, retrain (2 min) + serve test rerun in a clean
   collect-copy environment, committed via Save & Run All.
+
+- 0005: chunked CE loss (default; --loss-mode naive kept) + collect --enforce-eager / --gpu-memory-utilization; Cell 1 verbatim in baseline-runbook — pending re-smoke: train 7 gold rows at --max-len 8192, then serve test
