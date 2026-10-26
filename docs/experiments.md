@@ -179,3 +179,31 @@ vs the 30-task subset (5.83% sample pass, 2 gold tasks / 7 rows): rates are
 consistent; gold doubled to 14 rows. Next: real P2 train on gold (optionally
 a gold+silver variant), then the dev A/B (adapter vs base on holdout tasks)
 for the Paper Track results table (hard gate Nov 2).
+
+## 2026-10-26 — Real P2 adapters trained on RunPod (Kaggle GPU quota exhausted)
+
+Kaggle weekly GPU quota hit (33:43 / 30 h, resets ~2026-10-30), so training
+moved to RunPod (A40 48GB, $0.60/h all-in; balance $9.73 → ~$9.05). Data
+verified locally first: gold 14 rows, silver 9 rows (from the expand-1
+output bundle). Weights: HF `google/gemma-4-12b-it` (23 GB, no gating issue).
+
+- **adapter_gold**: 14 rows, 3 epochs, 42 steps, train_loss 0.4104.
+  95,547 tokens, 18,388 supervised (19.24%), 6 rows truncated.
+  sha256 807b13f39195ece6c4e9df2506e26641575f1d2c2c803f7b8fbc81a05f04e8dd
+- **adapter_goldsilver**: 23 rows → 22 examples (1 silver row lost all
+  supervision to truncation), 3 epochs, 66 steps, train_loss 0.3689.
+  152,676 tokens, 31,689 supervised (20.76%), 13 rows truncated.
+  sha256 9262d634ea11a4f7a5b17b75628bf94fd87b63d1f05dac892d2224ba7638bdea
+- Both adapters (262,363,376 B safetensors) downloaded to
+  ~/workspace/gemma4-ab/ and hash-verified against the pod's values.
+- **Template note**: on the pod, the script's byte-exact check against the
+  LOCAL (HF) tokenizer failed and training proceeded with
+  `--allow-template-mismatch`. The hand-ported renderer was verified
+  byte-exact against the KAGGLE-mounted tokenizer, which is the serving
+  environment that matters — so training used Kaggle-faithful renders; the
+  HF packaging's template apparently differs from Kaggle's.
+- Pending: holdout A/B (base vs gold vs goldsilver, --split holdout, n=2,
+  4-min cap) on Kaggle after the ~Oct 30 quota reset. Adapters must be
+  uploaded as private Kaggle datasets and attached to gemma4-ab-1; its
+  wiring cells currently copy adapters from /kaggle/working paths produced
+  by in-notebook training — adjust to the dataset paths at relaunch.
