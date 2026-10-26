@@ -110,3 +110,29 @@ Readings:
   only None / T4 x2 / TPU. Stage-2 training therefore runs in a copy of the
   collect notebook (which retains L4x4), with the transformers-variant model
   attached additionally. Internet is available in non-competition notebooks.
+
+## 2026-10-25 — Stage 2: training WORKS; serve test blocked on vLLM CUDA-graph OOM
+
+Notebook gemma4-train-l4 (copy of collect notebook, L4x4). Environment had to
+be hand-fixed in-session (starter Cell 1 was not in the copy; a hand-rolled
+pip line failed on dependency resolution — the wheelhouse lacks
+google-cloud-bigquery-storage, so installs need --no-deps + forced upgrades:
+transformers 5.13.1, peft 0.19.1, torchao uninstalled for peft compat).
+
+- **Training (max_len 2048): SUCCESS in 106 s.** 65,568,768 trainable params
+  (0.5453%), 12 steps, loss 6.13 → 0.91 (train_loss 2.657). Adapter saved:
+  262.4 MB, base google/gemma-4-12b-it, keys text. (At 2048 the set degrades
+  to 6 examples / 218 supervised tokens — fine for a mechanics smoke; the
+  real run needs the chunked-loss fix in 0005 to train at 8192.)
+- **Packaging: SUCCESS.** agent_wired (root `adapter: sft_v1`) validates;
+  submission zip 240.8 MB.
+- **Serve test: BLOCKED.** vLLM (0.19.1, hand-installed --no-deps after 5
+  missing-module rounds) started, model loaded (2.35 GiB/GPU), then OOM in
+  CUDA graph capture (Worker TP3, capture_end). The adapter was never
+  reached, so key-style is still unverified. Differences vs the working
+  collect runs: LoRA enabled, and this session's package versions drifted
+  from the clean starter install. Fix path (0005): plumb --enforce-eager /
+  --gpu-memory-utilization into collect's VllmConfig for serve tests, and
+  re-test in a clean collect-notebook environment with the adapter attached
+  as a notebook-output input. Adapter + wired agent preserved in train-l4's
+  working dir (to be snapshotted as a saved version).
