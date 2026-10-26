@@ -163,3 +163,19 @@ transformers 5.13.1, peft 0.19.1, torchao uninstalled for peft compat).
   the real A/B after expanded collection.
 - P2 status: implementation + pipeline DONE. Remaining P2 item per CLAUDE.md
   is the dev-split A/B row, which needs a real adapter from expanded data.
+
+## 2026-10-26 — Expanded collection COMPLETE (v4-collect-expand-1)
+
+Full train split covered in ONE window (no second window needed).
+Cumulative summary.json (seeded 120 + 280 new):
+
+- tasks_covered 100, samples 400, sample pass 7.5% (30/400)
+- task pass@n 16% (16/100 tasks solved at least once)
+- **gold: 5 tasks / 14 rows** (507.54 kB, all with messages)
+- silver: 9 tasks (499.06 kB); divergent dropped: 2 tasks
+- avg 5.93 min/sample at the 7-min collection cap; raw log 19.12 MB
+
+vs the 30-task subset (5.83% sample pass, 2 gold tasks / 7 rows): rates are
+consistent; gold doubled to 14 rows. Next: real P2 train on gold (optionally
+a gold+silver variant), then the dev A/B (adapter vs base on holdout tasks)
+for the Paper Track results table (hard gate Nov 2).
