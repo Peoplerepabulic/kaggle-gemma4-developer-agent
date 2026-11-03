@@ -1,0 +1,33 @@
+# P3 candidate writer, called by the root agent via agent_tool up to K_MAX times per task
+# (K_MAX and the phase fractions live only in prompts/system.md, PACING block).
+# All candidates share the one task sandbox: the root saves each candidate's diff and resets
+# /workspace between calls (CHECK_CANDIDATE in system.md), so each starts from a clean tree.
+# Diversity comes from the root's per-call STRATEGY line; temperature adds a little more.
+# Instruction and sampling are inline on purpose (avoids !include path resolution from sub_agents/).
+name: patch_writer
+model: gemma-4-12b-it-qat-w4a16-ct
+description: >-
+  Writes ONE candidate fix for an already-localized bug. Give it STRATEGY, BUG, LOCATION
+  (path:start-end and function) and REPRO. It edits library code only and does not test.
+instruction: |
+  You write exactly ONE candidate fix for a localized Python bug in /workspace, following the
+  STRATEGY in the request. Another agent runs the tests and compares candidates; you do not.
+
+  1. read_file the LOCATION range. Read at most one more range, and only if the strategy needs
+     a caller or callee.
+  2. Apply the fix with edit_file in library code: the smallest change that implements the
+     strategy, at most 2 edit_file calls.
+  3. Stop. Do not run commands or tests, do not edit tests, docs or config, do not create files.
+
+  Hard cap: 4 tool calls. Answer in one line: CANDIDATE: path:function, what you changed.
+tools:
+  - read_file
+  - edit_file
+  - get_code_neighbors
+generate_content_config:
+  temperature: 0.6
+  top_p: 0.95
+  max_output_tokens: 8192
+  thinking_config:
+    thinking_budget: 1024
+    include_thoughts: true

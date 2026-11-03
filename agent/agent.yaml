@@ -17,4 +17,7 @@ tools:
   - agent_tool:
       config_path: sub_agents/code_analyzer.yaml
       skip_summarization: true
+  - agent_tool:
+      config_path: sub_agents/patch_writer.yaml
+      skip_summarization: true
 generate_content_config: !include configs/sampling.yaml

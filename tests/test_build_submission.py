@@ -110,8 +110,8 @@ class ValidateTests(unittest.TestCase):
 
     def test_official_starter_agent_yaml_passes_schema(self) -> None:
         shutil.copy(ROOT / "tests" / "fixtures" / "starter_agent.yaml", self.agent / "agent.yaml")
-        p = self.agent / "sub_agents" / "code_analyzer.yaml"
-        p.write_text(p.read_text().replace("12b", "31b"))
+        for p in (self.agent / "sub_agents").glob("*.yaml"):  # starter is 31B: every sub-agent follows
+            p.write_text(p.read_text().replace("12b", "31b"))
         self.add_adapter("google/gemma-4-31b-it")
         (self.agent / "adapters" / "a1").rename(self.agent / "adapters" / "main_lora")
         self.assertEqual(self.errs(), [])

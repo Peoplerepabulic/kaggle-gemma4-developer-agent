@@ -255,3 +255,5 @@ Readings:
 - Avg ~3.6–3.8 min/sample sits at the 4-min cap again: time remains
   the binding constraint in scored runs, as in collection.
 - Notebook: https://www.kaggle.com/code/cheeway/gemma4-ab-1?scriptVersionId=364924042
+
+- 0006 P3 in-session verifier best-of-n (K_MAX=3 patch_writer candidates, get_status time pacing, CHECK/APPLY_CANDIDATE in system.md; budgets unchanged 4 min / 70 calls / 60 turns) — pending Kaggle holdout A/B vs base (2/29 tasks, 2/58 samples): --split holdout --n 2 --max-time-minutes 4

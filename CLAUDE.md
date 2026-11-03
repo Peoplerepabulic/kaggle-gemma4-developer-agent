@@ -133,6 +133,12 @@ checkpoints/weights are NOT committed, and a dev-split A/B (harness-only vs
 harness+LoRA) row is logged in `docs/experiments.md`.
 
 ### P3 — Verifier integration
+**Status 2026-11-03: implemented (0006), pending Kaggle A/B** — in-session
+best-of-n: phases L / C/V / S in `agent/prompts/system.md` (K_MAX and phase
+fractions in its PACING block only), `sub_agents/patch_writer.yaml` writes
+the candidates, pacing from `get_status` time fields; reference policy +
+workflow in `scripts/verifier_select.py`. Next: holdout A/B vs base per the
+0006 spec (--split holdout --n 2 --max-time-minutes 4).
 Move `verifier_select.select_patch` policy into the agent flow: among
 candidate patches prefer (a) all-tests-passing, then (b) smallest diff;
 if none passes, fewest failing tests, then smallest diff. Gate extra samples
