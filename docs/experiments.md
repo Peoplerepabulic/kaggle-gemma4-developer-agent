@@ -224,24 +224,34 @@ lightweight Output page, so the exact finish time is unconfirmed.
 |---|---|---|---|---|---|
 | base | 29 | 58 | 0.0345 (2/58) | 0.069 (2/29) | 3.74 |
 | gold | 29 | 58 | 0 (0/58) | 0 (0/29) | 3.77 |
-| goldsilver | 29 | 58 | 0.0345 (2/58) | 0.069 (2/29) | 3.79 |
+| goldsilver | 29 | 58 | 0.0172 (1/58) | 0.0345 (1/29) | 3.58 |
+
+**Correction (2026-11-03, later the same day):** the goldsilver row above
+was initially misread from the Kaggle UI as 0.0345 / 0.069 (a duplicate of
+base). The figures here are from the summary.json files downloaded via
+the Kaggle API and cross-checked against the raw sample logs; they
+supersede the earlier reading everywhere it appeared.
 
 Raw summary.json fields for reference: ab_base silver_tasks 2,
 avg_diff_size_kept 8.5; ab_gold silver_tasks 0, avg_diff_size_kept 0;
-ab_goldsilver silver_tasks 2, avg_diff_size_kept 8.5; all three report
+ab_goldsilver silver_tasks 1, avg_diff_size_kept 11.0; all three report
 gold_tasks 0, gold_rows 0, dropped_divergent_tasks 0,
 kept_rows_missing_messages 0.
 
+Passing tasks from the raw logs (resolved samples):
+- base: requests_6644 (1/2), rich_3518 (1/2)
+- gold: none
+- goldsilver: requests_6644 (1/2) — a strict subset of base's passes;
+  no task that base failed was solved by either adapter.
+
 Readings:
-- **Neither adapter improved on base.** gold fell to zero (2 fewer
-  passing samples, 2 fewer passing tasks than base); goldsilver tied
-  base exactly on both rates (summary alone cannot confirm whether the
-  same 2 tasks passed).
-- With n=2 and only 29 tasks, a 2-task swing is small-sample noise
+- **Neither adapter improved on base.** gold fell to zero; goldsilver
+  kept only 1 of base's 2 passing tasks. No adapter-only wins.
+- With n=2 and only 29 tasks, a 1–2 task swing is small-sample noise
   territory — this is a null/negative A/B result, not proof the adapters
   hurt. It does NOT support a "LoRA helps" claim for the Paper Track
   results table; the honest row is base 6.9% task pass@2, gold 0%,
-  goldsilver 6.9%.
-- Avg ~3.74–3.79 min/sample sits at the 4-min cap again: time remains
+  goldsilver 3.4%.
+- Avg ~3.6–3.8 min/sample sits at the 4-min cap again: time remains
   the binding constraint in scored runs, as in collection.
 - Notebook: https://www.kaggle.com/code/cheeway/gemma4-ab-1?scriptVersionId=364924042
