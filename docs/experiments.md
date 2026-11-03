@@ -207,3 +207,41 @@ output bundle). Weights: HF `google/gemma-4-12b-it` (23 GB, no gating issue).
   uploaded as private Kaggle datasets and attached to gemma4-ab-1; its
   wiring cells currently copy adapters from /kaggle/working paths produced
   by in-notebook training — adjust to the dataset paths at relaunch.
+
+## 2026-11-03 — Holdout A/B COMPLETE (gemma4-ab-1 Version 1, scriptVersionId 364924042)
+
+Launched 2026-11-02 09:19 CST, Save & Run All, L4x4. In-notebook training
+of the gold and gold+silver LoRA adapters, then base / gold / goldsilver
+on the 29 holdout tasks (--split holdout, n=2, 4-min cap). Checked
+2026-11-03 morning via the lightweight Output page only (full log page
+NOT opened, per the check's constraint). Status concluded Complete from
+the presence of the full Output set (ab_base / ab_gold / ab_goldsilver
+summary.json files plus subm_gold.zip / subm_goldsilver.zip); no explicit
+"Complete" label or run start/finish timestamps were visible on the
+lightweight Output page, so the exact finish time is unconfirmed.
+
+| variant | tasks_covered | samples | sample_pass_rate | task_pass_at_n | avg_minutes_per_sample |
+|---|---|---|---|---|---|
+| base | 29 | 58 | 0.0345 (2/58) | 0.069 (2/29) | 3.74 |
+| gold | 29 | 58 | 0 (0/58) | 0 (0/29) | 3.77 |
+| goldsilver | 29 | 58 | 0.0345 (2/58) | 0.069 (2/29) | 3.79 |
+
+Raw summary.json fields for reference: ab_base silver_tasks 2,
+avg_diff_size_kept 8.5; ab_gold silver_tasks 0, avg_diff_size_kept 0;
+ab_goldsilver silver_tasks 2, avg_diff_size_kept 8.5; all three report
+gold_tasks 0, gold_rows 0, dropped_divergent_tasks 0,
+kept_rows_missing_messages 0.
+
+Readings:
+- **Neither adapter improved on base.** gold fell to zero (2 fewer
+  passing samples, 2 fewer passing tasks than base); goldsilver tied
+  base exactly on both rates (summary alone cannot confirm whether the
+  same 2 tasks passed).
+- With n=2 and only 29 tasks, a 2-task swing is small-sample noise
+  territory — this is a null/negative A/B result, not proof the adapters
+  hurt. It does NOT support a "LoRA helps" claim for the Paper Track
+  results table; the honest row is base 6.9% task pass@2, gold 0%,
+  goldsilver 6.9%.
+- Avg ~3.74–3.79 min/sample sits at the 4-min cap again: time remains
+  the binding constraint in scored runs, as in collection.
+- Notebook: https://www.kaggle.com/code/cheeway/gemma4-ab-1?scriptVersionId=364924042
